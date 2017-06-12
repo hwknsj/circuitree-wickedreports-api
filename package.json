@@ -1,0 +1,21 @@
+{
+  "name": "prepared-marketing",
+  "version": "1.0.0",
+  "description": "Node.js application to connect CircuiTree API to Wicked Reports API for Prepared Marketing.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "prepared-marketing"
+  },
+  "keywords": [
+    "CircuiTree",
+    "API",
+    "Wicked",
+    "Reports"
+  ],
+  "author": "Joel Hawkins <hwknsj@gmail.com>",
+  "license": "ISC"
+}
