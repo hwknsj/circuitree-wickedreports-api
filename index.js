@@ -58,7 +58,7 @@ rp(options).then(function(response) {
                     // (see https://api.mycircuitree.com/TBM/Services.aspx)
                     // For example, we'll Get Guest Registrations
                     options.url = 'https://api.circuitree.com/TBM/Registration/GetGuestRegistrations.json';
-                    options.body = { ApiToken:ApiToken, DaysToShowHistory:2147483647, EntityID:9223372036854775807 };
+                    options.body = { ApiToken: ApiToken, DaysToShowHistory: 2147483647, EntityID: 9223372036854775807 };
                     return rp(options)
                         .then(function(response) {
                             console.log(response);
@@ -67,7 +67,7 @@ rp(options).then(function(response) {
                         })
                         .catch(function(err) {
                             console.error(err);
-                            throw new Error(err);
+                            // throw new Error(err);
                         });
                 })
                 .catch(function(err) {
