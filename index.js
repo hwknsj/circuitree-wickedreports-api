@@ -8,10 +8,14 @@ with better error handling.
 by Joel Hawkins, Creative Circle
 */
 
-var request = require("request");
-var q = require("q");
+var promise = require("bluebird");
+var request = promise.promisify(require("request"));
+promise.promisifyAll(request);
 var rp = require("request-promise");
+promise.promisifyAll(rp);
 var moment = require("moment");
+
+
 
 // Declare some variables
 var APIKey,
@@ -30,13 +34,21 @@ circuiTree = {
     'Password': 't26IWPcQQouN5q',
     'CompanyCode': '15'
 };
+// Set the year we want to fetch
+// var eventYear = '2008';
+var args = process.argv.slice(2);
+var eventYear = args[0];
+
+// Wicked Reports credentials:
+var testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
+    wrApikey = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9';
 
 // First authenticate
 options = {
     method: 'POST',
     url: 'https://api.mycircuitree.com/Authentication/Authenticate.json',
     headers: {
-        'Content-Type': 'application/json'
+        'content-type': 'application/json'
     },
     body: circuiTree,
     json: true
@@ -45,92 +57,53 @@ options = {
 // Send the POST request
 rp(options).then(function(response) {
     // POST successful
-    console.log(response);
+    // console.log(response);
     // Store ApiToken, CompanyAPIURL
     ApiToken = response.ApiToken;
     CompanyAPIURL = response.CompanyAPIURL;
+    console.log(ApiToken, CompanyAPIURL);
 
-    // Now create user token
-    // all other options remain the same (e.g. method, headers, json)
-    options.url = CompanyAPIURL + '/Authentication/CreateUserToken.json';
-    options.body = {
-        ApiToken: ApiToken
+    // Now we can make get some data!
+    // url depends on which service you want to use
+    // (see https://api.mycircuitree.com/TBM/Services.aspx)
+
+    // We need to run ExportQueries, build query below
+    // Run the custom query ID '124' (Registration List – Detailed Email)
+
+    var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json"
+    var requestQuery = {
+        ApiToken: ApiToken,
+        ExportQueryID: "124",
+        QueryParameters: [
+            {
+                'ParameterID': "7", // Event Year
+                'ParameterValue': eventYear // use "2004|2005" to get multiple years
+            }
+        ]
     };
 
+    options.url = requestURL;
+    options.body = requestQuery;
+
+    console.log(options.body);
     return rp(options).then(function(response) {
-        console.log(response);
-        // Receive UserToken
-        var UserToken = response.UserToken;
 
-        // Now authenticate user token
-        options.url = CompanyAPIURL + '/Authentication/AuthenticateUserToken.json';
-        options.body = {
-            ApiToken: ApiToken,
-            UserToken: UserToken
-        };
-        return rp(options).then(function(response) {
+        var results = JSON.parse(response.Results);
+
+        // select only Active and Pending RegistrationStatus
+        results.filter(function(item) {
+            return item.EnrollmentStatusName === "Active" || item.EnrollmentStatusName === "Pending";
+        });
+
+        // wrInsertContacts returns an array of promises
+        return promise.all(wrInsertContacts(results)).then(function(response) {
+            // all requests were successful
             console.log(response);
-
-            // Now we can make get some data!
-            // url depends on which service you want to use
-            // (see https://api.mycircuitree.com/TBM/Services.aspx)
-
-            // We need to run ExportQueries, build query below
-            // Run the custom query ID '124' (Registration List – Detailed Email)
-            //
-
-            var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json"
-            var requestQuery = {
-                ApiToken: ApiToken,
-                ExportQueryID: "124",
-                QueryParameters: [
-                    {
-                        'ParameterID': "7", // Event Year
-                        'ParameterValue': "2004"
-                    }
-                ]
-            };
-
-            options.url = requestURL;
-            options.body = requestQuery;
-
-            console.log(options.body);
-            return rp(options).then(function(response) {
-                //console.log(JSON.parse(response.Results));
-
-                var results = JSON.parse(response.Results);
-
-                results.filter(function(item) {
-                    return item.EnrollmentStatusName === "Active" || item.EnrollmentStatusName === "Pending";
-                });
-
-                //console.log(results);
-
-                // var wrContacts = wrInsertContacts(results);
-
-                // console.log(wrContacts);
-
-                // Now we can pass this to Wicked Reports API!
-
-                // wrInsertContacts returns 'rp.all'
-                return wrInsertContacts(results).then(function() {
-                    // all requests were successful
-                    console.log("Success!");
-                })
-                .catch(function(err) {
-                    console.error(err);
-                    throw new Error(err);
-                });
-
-            }).catch(function(err) {
-                console.error(err);
-                // throw new Error(err);
-            });
+            console.log("Success!");
         }).catch(function(err) {
-            // Error authenticating ApiToken/UserToken
-            console.error(err);
             throw new Error(err);
         });
+
     }).catch(function(err) {
         console.error(err);
         throw new Error(err);
@@ -145,10 +118,12 @@ function wrInsertContacts(results) {
 
     var wrContacts = results.map(function(ct) {
         return {
-            "SourceSystem": "CircuiTreeTest",
+            "SourceSystem": "CircuiTree-Registration",
             "SourceID": ct.entityid,
             "CreateDate": moment(ct.EnrollmentDate).format("YYYY-MM-DD HH:mm:ss"),
-            "Email": ct.EmailAddress ? ct.EmailAddress : '',
+            "Email": ct.EmailAddress
+                ? ct.EmailAddress
+                : '', // if EmailAddress is undefined, leave it blank
             "FirstName": ct.EntityFirstName,
             "LastName": ct.EntityLastName,
             "City": ct.HomeCity,
@@ -157,7 +132,8 @@ function wrInsertContacts(results) {
         };
     });
 
-    // return arrays of max length 1000
+    // splice into arrays of max length 1000
+    // as per Wicked Reports limit
     var arrays = [],
         size = 1000;
     while (wrContacts.length > 0) {
@@ -171,17 +147,17 @@ function wrInsertContacts(results) {
         url: "https://api.wickedreports.com/contacts",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO'
+            'apikey': wrApikey
         },
         body: '',
         json: true
     };
 
-    for (var i=0; i < arrays.length; i++) {
+    for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
-        console.log(options.body);
+        console.log(options.body[0]);
         promises.push(rp(options));
     }
 
-    return q.all(promises);
+    return promises;
 }
