@@ -9,7 +9,9 @@ by Joel Hawkins, Creative Circle
 */
 
 var request = require("request");
+var q = require("q");
 var rp = require("request-promise");
+var moment = require("moment");
 
 // Declare some variables
 var APIKey,
@@ -143,10 +145,10 @@ function wrInsertContacts(results) {
 
     var wrContacts = results.map(function(ct) {
         return {
-            "SourceSystem": "CircuiTree",
+            "SourceSystem": "CircuiTreeTest",
             "SourceID": ct.entityid,
-            "CreateDate": ct.EnrollmentDate,
-            "Email": ct.EmailAddress,
+            "CreateDate": moment(ct.EnrollmentDate).format("YYYY-MM-DD HH:mm:ss"),
+            "Email": ct.EmailAddress ? ct.EmailAddress : '',
             "FirstName": ct.EntityFirstName,
             "LastName": ct.EntityLastName,
             "City": ct.HomeCity,
@@ -175,10 +177,11 @@ function wrInsertContacts(results) {
         json: true
     };
 
-    for (var i; i < arrays.length; i++) {
+    for (var i=0; i < arrays.length; i++) {
         options.body = arrays[i];
+        console.log(options.body);
         promises.push(rp(options));
     }
 
-    return rp.all(promises);
+    return q.all(promises);
 }
