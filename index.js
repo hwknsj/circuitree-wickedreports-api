@@ -134,10 +134,9 @@ rp(options).then(function(response) {
         }
 
         else if (exportType != "contacts"
-                || exportType != "orders"
-                || exportType // doesn't exist, misspelled etc.) {
+                || exportType != "orders") {
             console.log("Please use the syntax: 'npm start orders 2016' and try again.\n");
-            break;
+            throw new Error("Please use the syntax: 'npm start orders 2016' and try again.\n");
         }
 
     }).catch(function(err) {
@@ -223,7 +222,7 @@ function wrInsertOrders(results) {
             "SourceID": ct.ItineraryID, // ItineraryID unique ID for the itinerary
             "CreateDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"), // (format: "YYYY-MM-DD HH:MM:SS" UTC time)
             "ContactID": ct.entityid, // (unique number for that specific individual (camper)) or RegistrationID (unique for the specific individual (camper) registration to a specific event). Preference?
-            "ContactEmail": ct.BillingEmailAddress, //BillingEmailAddress
+            "ContactEmail": ct.BillingEmailAddress ? ct.BillingEmailAddress : '', //BillingEmailAddress
             "OrderTotal": Math.abs(orderTotal), // Charges + ReservationCharges + GiftCardCharges + MiscellaneousCharges (sum of these charges, as shown in spreadsheet)
             "Country": "USA", // (assuming all patrons are from the USA)
             "City": ct.HomeCity, // HomeCity
