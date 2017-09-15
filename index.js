@@ -32,11 +32,19 @@ circuiTree = {
     'Password': 't26IWPcQQouN5q',
     'CompanyCode': '15'
 };
-// Set the year we want to fetch
-// var eventYear = '2018';
+// Set the type of object and the year we want to fetch
+// e.g. in command line type:
+// npm start contacts 2018
+// npm start orders 2017
 var args = process.argv.slice(2);
-var eventYear = args[0];
-var ExportQueryID = -195; // -195 for Registration Accounting summary. Use 124 for contacts
+var exportType = args[0],
+    eventYear = args[1];
+var ExportQueryID;
+if (exportType === "orders") {
+    ExportQueryID = -195; // -195 for Registration Accounting summary. Use 124 for contacts
+} else if (exportType === "contacts") {
+    ExportQueryID = 124;
+}
 
 // Wicked Reports credentials:
 var testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
@@ -69,6 +77,7 @@ rp(options).then(function(response) {
 
     // We need to run ExportQueries, build query below
     // Run the custom query ID '124' (Registration List – Detailed Email)
+    // or Registration Accounting Summary '-195'
 
     var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json"
     var requestQuery = {
@@ -101,22 +110,35 @@ rp(options).then(function(response) {
         // return console.log(results);
 
         // wrInsertContacts returns an array of promises
-        /*return promise.all(wrInsertContacts(results)).then(function(response) {
-            // all requests were successful
-            console.log(response);
-            console.log("Success!");
-        }).catch(function(err) {
-            throw new Error(err);
-        });*/
+        if (exportType === "contacts") {
+            return promise.all(wrInsertContacts(results)).then(function(response) {
+                // all requests were successful
+                console.log(JSON.stringify(response,null,2));
+                console.log("Success!");
+            }).catch(function(err) {
+                console.log(JSON.stringify(err,null,2));
+                throw new Error(err);
+            });
+        }
 
         // wrInsertOrders returns an array of promises
-        return promise.all(wrInsertOrders(results)).then(function(response) {
-            // all requests were successful
-            console.log(JSON.stringify(response,null,2));
-            console.log("Success!");
-        }).catch(function(err) {
-            throw new Error(err);
-        });
+        if (exportType === "orders") {
+            return promise.all(wrInsertOrders(results)).then(function(response) {
+                // all requests were successful
+                console.log(JSON.stringify(response,null,2));
+                console.log("Success!");
+            }).catch(function(err) {
+                console.log(JSON.stringify(err,null,2));
+                throw new Error(err);
+            });
+        }
+
+        else if (exportType != "contacts"
+                || exportType != "orders"
+                || exportType // doesn't exist, misspelled etc.) {
+            console.log("Please use the syntax: 'npm start orders 2016' and try again.\n");
+            break;
+        }
 
     }).catch(function(err) {
         console.error(JSON.stringify(err,null,2));
@@ -182,14 +204,27 @@ function wrInsertContacts(results) {
 function wrInsertOrders(results) {
 
     var wrOrders = results.map(function(ct) {
-        var orderTotal = (ct.Charges ? ct.Charges : 0) + (ct.Discounts ? ct.Discounts : 0) + (ct.Scholarships ? ct.Scholarships : 0) + (ct.ReservationCharges ? ct.ReservationCharges : 0) + (ct.MiscellaneousCharges ? ct.MiscellaneousCharges : 0) + (ct.GiftCardCharges ? ct.GiftCardCharges : 0);
+        // orderTotal should be the sum of all charges, discounts, and Scholarships
+        // This may be different than Payments
+
+        // The total amount paid should be totalPayments = Payments + GiftCardPayments
+        // ignore the ( variable ? variable : 0 ) things. This just means "does variable exist" ? value_if_true : value_if_false
+        // this way we don't get errors for having blank, null, or NaN ("Not a Number"), not all contacts have these values.
+        var chargesTotal = (ct.Charges ? ct.Charges : 0)
+            + (ct.Discounts ? ct.Discounts : 0)
+            + (ct.Scholarships ? ct.Scholarships : 0)
+            + (ct.ReservationCharges ? ct.ReservationCharges : 0)
+            + (ct.MiscellaneousCharges ? ct.MiscellaneousCharges : 0)
+            + (ct.GiftCardCharges ? ct.GiftCardCharges : 0);
+
+        var orderTotal = ct.Payments ? ct.Payments : chargesTotal;
         return {
             "SourceSystem": "CircuiTree-Orders", // (constant)
             "SourceID": ct.ItineraryID, // ItineraryID unique ID for the itinerary
             "CreateDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"), // (format: "YYYY-MM-DD HH:MM:SS" UTC time)
             "ContactID": ct.entityid, // (unique number for that specific individual (camper)) or RegistrationID (unique for the specific individual (camper) registration to a specific event). Preference?
             "ContactEmail": ct.BillingEmailAddress, //BillingEmailAddress
-            "OrderTotal": (orderTotal ? orderTotal : 0), // Charges + ReservationCharges + GiftCardCharges + MiscellaneousCharges (sum of these charges, as shown in spreadsheet)
+            "OrderTotal": Math.abs(orderTotal), // Charges + ReservationCharges + GiftCardCharges + MiscellaneousCharges (sum of these charges, as shown in spreadsheet)
             "Country": "USA", // (assuming all patrons are from the USA)
             "City": ct.HomeCity, // HomeCity
             "State": ct.HomeState, // HomeState
@@ -198,7 +233,7 @@ function wrInsertOrders(results) {
                 { //array of order items: for best results I'll make sure Charges, Discounts, Scholarships, ReservationCharges, and MiscellaneousCharges are separate array items
                     "OrderItemID": "Charges", // either one of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges] OR RegistrationID (unique for the specific individual (camper) registration to a specific event). Probably depends on what you think "ContactID" should be...
                     "Qty": ct.RegistrationQuantity, // (only makes sense, right?)
-                    "PPU": Math.abs(ct.Charges) ? Math.abs(ct.Charges) : 0 // this will be the dollar amount of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges]
+                    "PPU": Math.abs(ct.Charges) ? Math.abs(ct.Charges) : 0
                 }, {
                     "OrderItemID": "Discounts",
                     "Qty": ct.RegistrationQuantity,
@@ -206,7 +241,7 @@ function wrInsertOrders(results) {
                 }, {
                     "OrderItemID": "ReservationCharges",
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.ReservationCharges) ?  Math.abs(ct.ReservationCharges) : 0
+                    "PPU": Math.abs(ct.ReservationCharges) ? Math.abs(ct.ReservationCharges) : 0
                 }, {
                     "OrderItemID": "Scholarships",
                     "Qty": ct.RegistrationQuantity,
@@ -234,6 +269,10 @@ function wrInsertOrders(results) {
             ]
         }
     });
+
+    /* ------------------------------------
+        Here is where the magic happens!
+       ----------------------------------- */
 
     // splice into arrays of max length 1000
     // as per Wicked Reports limit
@@ -265,36 +304,40 @@ function wrInsertOrders(results) {
     return promises;
 }
 
-// var results = [{
-//     "RegistrationID": "123988",
-//     "entityid": "1146357",
-//     "EntityName": 'Blackwell, Chase',
-//     "EntityFirstName": 'Chase',
-//     "EntityLastName": 'Blackwell',
-//     "RegistrationQuantity": 1,
-//     "ItineraryID": 187620,
-//     "ItineraryEntityID": 1253771,
-//     "ItineraryEntityName": 'Catherine Harm Family',
-//     "HomeAddress1": '9745 Trophy Oaks Dr',
-//     "HomeCity": 'San Antonio',
-//     "HomeState": 'TX',
-//     "HomeZip": '78266',
-//     "HomePhone": '2108315688',
-//     "BillingEmailAddress": 'TBlackwell1@satx.rr.com',
-//     "EntityCommunicationMechanismID": 19235,
-//     "EventDivisionID": 1216,
-//     "DivisionName": 'Camp Travis Session 1 Male',
-//     "abbreviation": '2018 CT S1 7D M',
-//     "EventBeginDate": '2018-06-03T00:00:00',
-//     "EventID": 508,
-//     "EventName": 'Camp Travis Session 1',
-//     "EventFullName": '2018 Camp Travis Session 1 7 Days',
-//     "RegistrationStatus": 'Active',
-//     "Charges": 825,
-//     "Discounts": 0,
-//     "Scholarships": 0,
-//     "ReservationCharges": 0,
-//     "MiscellaneousCharges": 0,
-//     "Payments": -125,
-//     "RegistrationBalance": 700
-// }];
+// For testing
+
+/*
+var results = [{
+    "RegistrationID": "123988",
+    "entityid": "1146357",
+    "EntityName": 'Blackwell, Chase',
+    "EntityFirstName": 'Chase',
+    "EntityLastName": 'Blackwell',
+    "RegistrationQuantity": 1,
+    "ItineraryID": 187620,
+    "ItineraryEntityID": 1253771,
+    "ItineraryEntityName": 'Catherine Harm Family',
+    "HomeAddress1": '9745 Trophy Oaks Dr',
+    "HomeCity": 'San Antonio',
+    "HomeState": 'TX',
+    "HomeZip": '78266',
+    "HomePhone": '2108315688',
+    "BillingEmailAddress": 'TBlackwell1@satx.rr.com',
+    "EntityCommunicationMechanismID": 19235,
+    "EventDivisionID": 1216,
+    "DivisionName": 'Camp Travis Session 1 Male',
+    "abbreviation": '2018 CT S1 7D M',
+    "EventBeginDate": '2018-06-03T00:00:00',
+    "EventID": 508,
+    "EventName": 'Camp Travis Session 1',
+    "EventFullName": '2018 Camp Travis Session 1 7 Days',
+    "RegistrationStatus": 'Active',
+    "Charges": 825,
+    "Discounts": 0,
+    "Scholarships": 0,
+    "ReservationCharges": 0,
+    "MiscellaneousCharges": 0,
+    "Payments": -125,
+    "RegistrationBalance": 700
+}];
+*/
