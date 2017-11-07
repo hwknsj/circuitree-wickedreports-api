@@ -41,13 +41,15 @@ var exportType = args[0],
     eventYear = args[1];
 var ExportQueryID;
 if (exportType === "orders") {
-    ExportQueryID = -195; // -195 for Registration Accounting summary. Use 124 for contacts
+    ExportQueryID = -195; // -195 for Registration Accounting summary. Use 124 for contacts, -397 for Event Availability
 } else if (exportType === "contacts") {
     ExportQueryID = 124;
+} else if (exportType === "products") {
+    ExportQueryID = -397;
 }
 
 // Wicked Reports credentials:
-var testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
+const testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
     wrApikey = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9',
     wrApiKeyNew = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9';
 
@@ -80,19 +82,34 @@ rp(options).then(function(response) {
     // or Registration Accounting Summary '-195'
 
     var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json"
-    var requestQuery = {
-        ApiToken: ApiToken,
-        ExportQueryID: ExportQueryID, // using -195 for Registration Account Summary, 124 for contacts
-        QueryParameters: [
-            {
-                'ParameterID': 7, // Event Year
-                'ParameterValue': eventYear // use "2004|2005" to get multiple years
-            }, {
-                'ParameterID': 51, // Registration Status
-                'ParameterValue': 1 // "Active"
-            }
-        ]
-    };
+    if (ExportQueryID === -397) {
+        // Products
+        var requestQuery = {
+            ApiToken: ApiToken,
+            ExportQueryID: ExportQueryID, // using -397 for Event Availability
+            QueryParameters: [
+                {
+                    'ParameterID': 230, // Attendee selection
+                    'ParameterValue': 1 // "Yes"
+                }
+            ]
+        };
+    } else {
+        // Order or contacts
+        var requestQuery = {
+            ApiToken: ApiToken,
+            ExportQueryID: ExportQueryID, // using -195 for Registration Account Summary, 124 for contacts
+            QueryParameters: [
+                {
+                    'ParameterID': 7, // Event Year
+                    'ParameterValue': eventYear // use "2004|2005" to get multiple years
+                }, {
+                    'ParameterID': 51, // Registration Status
+                    'ParameterValue': 1 // "Active"
+                }
+            ]
+        };
+    }
 
     options.url = requestURL;
     options.body = requestQuery;
@@ -133,8 +150,20 @@ rp(options).then(function(response) {
             });
         }
 
+        if (exportType === "products") {
+            return promise.all(wrInsertProducts(results)).then(function(response) {
+                // all requests were successful
+                console.log(JSON.stringify(response,null,2));
+                console.log("Success!");
+            }).catch(function(err) {
+                console.log(JSON.stringify(err,null,2));
+                throw new Error(err);
+            });
+        }
+
         else if (exportType != "contacts"
-                || exportType != "orders") {
+                || exportType != "orders"
+                || exportType != "products") {
             console.log("Please use the syntax: 'npm start orders 2016' and try again.\n");
             throw new Error("Please use the syntax: 'npm start orders 2016' and try again.\n");
         }
@@ -197,6 +226,52 @@ function wrInsertContacts(results) {
     return promises;
 }
 
+// Update 6 Nov. 2017 - by Joel Hawkins to add products
+// Map ProductID to ProductName in Wicked Reports where
+// EventID => ProductID
+// LocationName => ProductName
+function wrInsertProducts(results) {
+
+    var wrProducts = results.map(function(ct) {
+        return {
+            "SourceSystem": "CircuiTree-Products", // CircuiTree-Products
+            "SourceID": ct.EventID, // varchar(500) //REQUIRED// product id in the original system
+            "ProductName": ct.LocationName, // varchar(500) //REQUIRED//
+            "ProductPrice": 0.00 // decimal(18,2) //REQUIRED//
+        };
+    });
+
+    // splice into arrays of max length 1000
+    // as per Wicked Reports limit
+    var arrays = [],
+        size = 1000;
+    while (wrProducts.length > 0) {
+        arrays.push(wrProducts.splice(0, size));
+    }
+
+    var promises = [];
+
+    var options = {
+        method: 'POST',
+        url: "https://api.wickedreports.com/products",
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9',
+            'test': 1 // run as a test for now
+        },
+        body: '',
+        json: true
+    };
+
+    for (var i = 0; i < arrays.length; i++) {
+        options.body = arrays[i];
+        console.log(options.body[0]);
+        promises.push(rp(options));
+    }
+
+    return promises;
+}
+
 // NEW 13 Sept. 2017 - by Joel Hawkins to get Orders
 // Need to do some math... we are going to
 // input is CircuiTree query -195 results: orders
@@ -231,26 +306,32 @@ function wrInsertOrders(results) {
             "OrderItems": [
                 { //array of order items: for best results I'll make sure Charges, Discounts, Scholarships, ReservationCharges, and MiscellaneousCharges are separate array items
                     "OrderItemID": "Charges", // either one of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges] OR RegistrationID (unique for the specific individual (camper) registration to a specific event). Probably depends on what you think "ContactID" should be...
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity, // (only makes sense, right?)
                     "PPU": Math.abs(ct.Charges) ? Math.abs(ct.Charges) : 0
                 }, {
                     "OrderItemID": "Discounts",
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
                     "PPU": Math.abs(ct.Discounts) ? Math.abs(ct.Discounts) : 0
                 }, {
                     "OrderItemID": "ReservationCharges",
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
                     "PPU": Math.abs(ct.ReservationCharges) ? Math.abs(ct.ReservationCharges) : 0
                 }, {
                     "OrderItemID": "Scholarships",
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
                     "PPU": Math.abs(ct.Scholarships) ? Math.abs(ct.Scholarships) : 0
                 }, {
                     "OrderItemID": "MiscellaneousCharges",
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
                     "PPU": Math.abs(ct.MiscellaneousCharges) ? Math.abs(ct.MiscellaneousCharges) : 0
                 }, {
                     "OrderItemID": "GiftCardCharges",
+                    "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
                     "PPU": Math.abs(ct.GiftCardCharges) ? Math.abs(ct.GiftCardCharges) : 0
                 }
@@ -288,7 +369,8 @@ function wrInsertOrders(results) {
         url: "https://api.wickedreports.com/orders",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': wrApiKeyNew
+            'apikey': wrApiKeyNew,
+            'test': 1 // For testing, will appear in the API Verification tool
         },
         body: '',
         json: true
