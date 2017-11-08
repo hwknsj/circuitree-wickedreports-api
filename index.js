@@ -1,12 +1,10 @@
-/*
-Connects CircuiTree API with Wicked Reports APIKey
+/* Connects CircuiTree API with Wicked Reports APIKey
 for Prepared Marketing.
 
 Uses Promises for asynchronous requests & faster results
 with better error handling.
 
-by Joel Hawkins, Creative Circle
-*/
+by Joel Hawkins, Creative Circle */
 
 var promise = require("bluebird");
 var request = promise.promisify(require("request"));
@@ -23,7 +21,47 @@ var APIKey,
     circuiTree,
     options,
     ApiToken,
-    CompanyAPIURL;
+    CompanyAPIURL,
+    testMode;
+
+/* ---------------------------------------------------
+Set the type of object and the year we want to fetch
+e.g. in command line type:
+    npm start contacts 2018
+    npm start orders 2017
+    npm start products
+    npm test
+ ----------------------------------------------------- */
+var args = process.argv.slice(2);
+var exportType = args[0],
+    eventYear = args[1],
+    testMode = process.env.NODE_ENV === "test"
+        ? 1
+        : 0;
+
+var ExportQueryID;
+// npm start orders 2018
+// if (exportType === "orders") {
+//     ExportQueryID = -195;  -195 for Registration Accounting summary
+// } else if (exportType === "contacts") {
+//     ExportQueryID = 124;  124 for contacts
+// } else if (exportType === "products") {
+//     ExportQueryID = -397;  -397 for Event Availability
+// }
+
+switch (exportType) {
+    case "orders":
+        ExportQueryID = -195; // -195 for Registration Accounting summary
+        break;
+    case "contacts":
+        ExportQueryID = 124; // 124 for contacts
+        break;
+    case "products":
+        ExportQueryID = -397; // -397 for Event Availability
+        break;
+    default:
+        console.error("Incorrect syntax! Use 'npm start orders YYYY\n'");
+}
 
 // CircuiTree login info:
 circuiTree = {
@@ -32,26 +70,15 @@ circuiTree = {
     'Password': 't26IWPcQQouN5q',
     'CompanyCode': '15'
 };
-// Set the type of object and the year we want to fetch
-// e.g. in command line type:
-// npm start contacts 2018
-// npm start orders 2017
-var args = process.argv.slice(2);
-var exportType = args[0],
-    eventYear = args[1];
-var ExportQueryID;
-if (exportType === "orders") {
-    ExportQueryID = -195; // -195 for Registration Accounting summary. Use 124 for contacts, -397 for Event Availability
-} else if (exportType === "contacts") {
-    ExportQueryID = 124;
-} else if (exportType === "products") {
-    ExportQueryID = -397;
-}
 
 // Wicked Reports credentials:
 const testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
     wrApikey = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9',
     wrApiKeyNew = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9';
+
+/* ------------------------------------
+    CircuiTree Request
+   ----------------------------------- */
 
 // First authenticate
 options = {
@@ -81,34 +108,29 @@ rp(options).then(function(response) {
     // Run the custom query ID '124' (Registration List – Detailed Email)
     // or Registration Accounting Summary '-195'
 
-    var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json"
-    if (ExportQueryID === -397) {
-        // Products
-        var requestQuery = {
+    var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json",
+        requestQuery = {
             ApiToken: ApiToken,
-            ExportQueryID: ExportQueryID, // using -397 for Event Availability
-            QueryParameters: [
-                {
-                    'ParameterID': 230, // Attendee selection
-                    'ParameterValue': 1 // "Yes"
-                }
-            ]
+            ExportQueryID: ExportQueryID,
+            QueryParameters: []
         };
-    } else {
-        // Order or contacts
-        var requestQuery = {
-            ApiToken: ApiToken,
-            ExportQueryID: ExportQueryID, // using -195 for Registration Account Summary, 124 for contacts
-            QueryParameters: [
-                {
-                    'ParameterID': 7, // Event Year
-                    'ParameterValue': eventYear // use "2004|2005" to get multiple years
-                }, {
-                    'ParameterID': 51, // Registration Status
-                    'ParameterValue': 1 // "Active"
-                }
-            ]
-        };
+    if (ExportQueryID === -397) { // Products
+        requestQuery.QueryParameters = [
+            {
+                'ParameterID': 230, // Attendee selection
+                'ParameterValue': 1 // "Yes"
+            }
+        ];
+    } else { // Order or contacts
+        requestQuery.QueryParameters = [
+            {
+                'ParameterID': 7, // Event Year
+                'ParameterValue': eventYear // use "2004|2005" to get multiple years
+            }, {
+                'ParameterID': 51, // Registration Status
+                'ParameterValue': 1 // "Active"
+            }
+        ];
     }
 
     options.url = requestURL;
@@ -130,10 +152,10 @@ rp(options).then(function(response) {
         if (exportType === "contacts") {
             return promise.all(wrInsertContacts(results)).then(function(response) {
                 // all requests were successful
-                console.log(JSON.stringify(response,null,2));
+                console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err,null,2));
+                console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
         }
@@ -142,10 +164,10 @@ rp(options).then(function(response) {
         if (exportType === "orders") {
             return promise.all(wrInsertOrders(results)).then(function(response) {
                 // all requests were successful
-                console.log(JSON.stringify(response,null,2));
+                console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err,null,2));
+                console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
         }
@@ -153,23 +175,19 @@ rp(options).then(function(response) {
         if (exportType === "products") {
             return promise.all(wrInsertProducts(results)).then(function(response) {
                 // all requests were successful
-                console.log(JSON.stringify(response,null,2));
+                console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err,null,2));
+                console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
-        }
-
-        else if (exportType != "contacts"
-                || exportType != "orders"
-                || exportType != "products") {
-            console.log("Please use the syntax: 'npm start orders 2016' and try again.\n");
-            throw new Error("Please use the syntax: 'npm start orders 2016' and try again.\n");
+        } else if (exportType != "contacts" || exportType != "orders" || exportType != "products") {
+            console.log("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
+            throw new Error("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
         }
 
     }).catch(function(err) {
-        console.error(JSON.stringify(err,null,2));
+        console.error(JSON.stringify(err, null, 2));
         throw new Error(err);
     });
 }).catch(function(err) {
@@ -177,6 +195,11 @@ rp(options).then(function(response) {
     throw new Error(err);
 });
 
+/* ------------------------------------
+    Wicked Reports functions
+   ----------------------------------- */
+
+// XXX: Insert Contacts
 // input is CircuiTree query 124 results
 function wrInsertContacts(results) {
 
@@ -211,7 +234,8 @@ function wrInsertContacts(results) {
         url: "https://api.wickedreports.com/contacts",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': wrApikeyNew
+            'apikey': wrApikeyNew//,
+            //'test': testMode // set by NODE_ENV
         },
         body: '',
         json: true
@@ -226,6 +250,7 @@ function wrInsertContacts(results) {
     return promises;
 }
 
+// XXX: Insert Products
 // Update 6 Nov. 2017 - by Joel Hawkins to add products
 // Map ProductID to ProductName in Wicked Reports where
 // EventID => ProductID
@@ -235,9 +260,9 @@ function wrInsertProducts(results) {
     var wrProducts = results.map(function(ct) {
         return {
             "SourceSystem": "CircuiTree-Products", // CircuiTree-Products
-            "SourceID": ct.EventID, // varchar(500) //REQUIRED// product id in the original system
-            "ProductName": ct.LocationName, // varchar(500) //REQUIRED//
-            "ProductPrice": 0.00 // decimal(18,2) //REQUIRED//
+            "SourceID": ct.EventID, // varchar(500) REQUIRED// product id in the original system
+            "ProductName": ct.LocationName, // varchar(500) REQUIRED//
+            "ProductPrice": ct.EventDivisionPrice // decimal(18,2) REQUIRED//
         };
     });
 
@@ -256,8 +281,8 @@ function wrInsertProducts(results) {
         url: "https://api.wickedreports.com/products",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9',
-            'test': 1 // run as a test for now
+            'apikey': '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9'//,
+            //'test': testMode // set by NODE_ENV
         },
         body: '',
         json: true
@@ -272,6 +297,7 @@ function wrInsertProducts(results) {
     return promises;
 }
 
+// XXX: Insert Orders
 // NEW 13 Sept. 2017 - by Joel Hawkins to get Orders
 // Need to do some math... we are going to
 // input is CircuiTree query -195 results: orders
@@ -284,70 +310,105 @@ function wrInsertOrders(results) {
         // The total amount paid should be totalPayments = Payments + GiftCardPayments
         // ignore the ( variable ? variable : 0 ) things. This just means "does variable exist" ? value_if_true : value_if_false
         // this way we don't get errors for having blank, null, or NaN ("Not a Number"), not all contacts have these values.
-        var chargesTotal = (ct.Charges ? ct.Charges : 0)
-            + (ct.Discounts ? ct.Discounts : 0)
-            + (ct.Scholarships ? ct.Scholarships : 0)
-            + (ct.ReservationCharges ? ct.ReservationCharges : 0)
-            + (ct.MiscellaneousCharges ? ct.MiscellaneousCharges : 0)
-            + (ct.GiftCardCharges ? ct.GiftCardCharges : 0);
+        var chargesTotal = (
+            ct.Charges
+            ? ct.Charges
+            : 0) + (
+            ct.Discounts
+            ? ct.Discounts
+            : 0) + (
+            ct.Scholarships
+            ? ct.Scholarships
+            : 0) + (
+            ct.ReservationCharges
+            ? ct.ReservationCharges
+            : 0) + (
+            ct.MiscellaneousCharges
+            ? ct.MiscellaneousCharges
+            : 0) + (
+            ct.GiftCardCharges
+            ? ct.GiftCardCharges
+            : 0);
 
-        var orderTotal = ct.Payments ? ct.Payments : chargesTotal;
+        var orderTotal = ct.Payments
+            ? ct.Payments
+            : chargesTotal;
         return {
             "SourceSystem": "CircuiTree-Orders", // (constant)
             "SourceID": ct.ItineraryID, // ItineraryID unique ID for the itinerary
             "CreateDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"), // (format: "YYYY-MM-DD HH:MM:SS" UTC time)
             "ContactID": ct.entityid, // (unique number for that specific individual (camper)) or RegistrationID (unique for the specific individual (camper) registration to a specific event). Preference?
-            "ContactEmail": ct.BillingEmailAddress ? ct.BillingEmailAddress : '', //BillingEmailAddress
+            "ContactEmail": ct.BillingEmailAddress
+                ? ct.BillingEmailAddress
+                : '', //BillingEmailAddress
             "OrderTotal": Math.abs(orderTotal), // Charges + ReservationCharges + GiftCardCharges + MiscellaneousCharges (sum of these charges, as shown in spreadsheet)
             "Country": "USA", // (assuming all patrons are from the USA)
             "City": ct.HomeCity, // HomeCity
             "State": ct.HomeState, // HomeState
             "SubscriptionID": ct.ItineraryEntityID, // ItineraryEntityID [must be UNIQUE] entityID of the individual who is the administrator of the Itinerary (usually the parent)
             "OrderItems": [
-                { //array of order items: for best results I'll make sure Charges, Discounts, Scholarships, ReservationCharges, and MiscellaneousCharges are separate array items
+                {
+                    //array of order items: for best results I'll make sure Charges, Discounts, Scholarships, ReservationCharges, and MiscellaneousCharges are separate array items
                     "OrderItemID": "Charges", // either one of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges] OR RegistrationID (unique for the specific individual (camper) registration to a specific event). Probably depends on what you think "ContactID" should be...
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity, // (only makes sense, right?)
-                    "PPU": Math.abs(ct.Charges) ? Math.abs(ct.Charges) : 0
+                    "PPU": Math.abs(ct.Charges)
+                        ? Math.abs(ct.Charges)
+                        : 0
                 }, {
                     "OrderItemID": "Discounts",
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.Discounts) ? Math.abs(ct.Discounts) : 0
+                    "PPU": Math.abs(ct.Discounts)
+                        ? Math.abs(ct.Discounts)
+                        : 0
                 }, {
                     "OrderItemID": "ReservationCharges",
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.ReservationCharges) ? Math.abs(ct.ReservationCharges) : 0
+                    "PPU": Math.abs(ct.ReservationCharges)
+                        ? Math.abs(ct.ReservationCharges)
+                        : 0
                 }, {
                     "OrderItemID": "Scholarships",
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.Scholarships) ? Math.abs(ct.Scholarships) : 0
+                    "PPU": Math.abs(ct.Scholarships)
+                        ? Math.abs(ct.Scholarships)
+                        : 0
                 }, {
                     "OrderItemID": "MiscellaneousCharges",
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.MiscellaneousCharges) ? Math.abs(ct.MiscellaneousCharges) : 0
+                    "PPU": Math.abs(ct.MiscellaneousCharges)
+                        ? Math.abs(ct.MiscellaneousCharges)
+                        : 0
                 }, {
                     "OrderItemID": "GiftCardCharges",
                     "ProductID": ct.EventID,
                     "Qty": ct.RegistrationQuantity,
-                    "PPU": Math.abs(ct.GiftCardCharges) ? Math.abs(ct.GiftCardCharges) : 0
+                    "PPU": Math.abs(ct.GiftCardCharges)
+                        ? Math.abs(ct.GiftCardCharges)
+                        : 0
                 }
             ],
             "OrderPayments": [
-                { //array related to the order payment transactions
+                {
+                    //array related to the order payment transactions
                     "PaymentDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"), // (this field is required, but I'm not sure if this is accessible using this particular query) (format: "YYYY-MM-DD HH:MM:SS" UTC Time )
-                    "Amount": Math.abs(ct.Payments) ? Math.abs(ct.Payments) : 0, // this will be the dollar amount of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges], same as PPU?
+                    "Amount": Math.abs(ct.Payments)
+                        ? Math.abs(ct.Payments)
+                        : 0, // this will be the dollar amount of [Charges, Discounts, Scholarships, ReservationCharges, MiscellaneousCharges], same as PPU?
                     "Status": "APPROVED" // (constant)
                 }, {
                     "PaymentDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"),
-                    "Amount": Math.abs(ct.GiftCardPayments) ? Math.abs(ct.GiftCardPayments) : 0,
+                    "Amount": Math.abs(ct.GiftCardPayments)
+                        ? Math.abs(ct.GiftCardPayments)
+                        : 0,
                     "Status": "APPROVED"
                 }
             ]
-        }
+        };
     });
 
     /* ------------------------------------
@@ -369,8 +430,8 @@ function wrInsertOrders(results) {
         url: "https://api.wickedreports.com/orders",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': wrApiKeyNew,
-            'test': 1 // For testing, will appear in the API Verification tool
+            'apikey': wrApiKeyNew//,
+            //'test': testMode // For testing, will appear in the API Verification tool
         },
         body: '',
         json: true
@@ -384,41 +445,3 @@ function wrInsertOrders(results) {
 
     return promises;
 }
-
-// For testing
-
-/*
-var results = [{
-    "RegistrationID": "123988",
-    "entityid": "1146357",
-    "EntityName": 'Blackwell, Chase',
-    "EntityFirstName": 'Chase',
-    "EntityLastName": 'Blackwell',
-    "RegistrationQuantity": 1,
-    "ItineraryID": 187620,
-    "ItineraryEntityID": 1253771,
-    "ItineraryEntityName": 'Catherine Harm Family',
-    "HomeAddress1": '9745 Trophy Oaks Dr',
-    "HomeCity": 'San Antonio',
-    "HomeState": 'TX',
-    "HomeZip": '78266',
-    "HomePhone": '2108315688',
-    "BillingEmailAddress": 'TBlackwell1@satx.rr.com',
-    "EntityCommunicationMechanismID": 19235,
-    "EventDivisionID": 1216,
-    "DivisionName": 'Camp Travis Session 1 Male',
-    "abbreviation": '2018 CT S1 7D M',
-    "EventBeginDate": '2018-06-03T00:00:00',
-    "EventID": 508,
-    "EventName": 'Camp Travis Session 1',
-    "EventFullName": '2018 Camp Travis Session 1 7 Days',
-    "RegistrationStatus": 'Active',
-    "Charges": 825,
-    "Discounts": 0,
-    "Scholarships": 0,
-    "ReservationCharges": 0,
-    "MiscellaneousCharges": 0,
-    "Payments": -125,
-    "RegistrationBalance": 700
-}];
-*/
