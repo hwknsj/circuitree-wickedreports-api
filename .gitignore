@@ -1,3 +1,4 @@
 node_modules
 node_modules/*
 /pm-circuitree-wreports-master.zip
+/package-lock.json

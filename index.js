@@ -37,7 +37,7 @@ var exportType = args[0],
     eventYear = args[1],
     testMode = process.env.NODE_ENV === "test"
         ? 1
-        : 0;
+        : false;
 
 var ExportQueryID;
 // npm start orders 2018
@@ -84,6 +84,7 @@ const testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
 options = {
     method: 'POST',
     url: 'https://api.mycircuitree.com/Authentication/Authenticate.json',
+    timeout: 500000,
     headers: {
         'content-type': 'application/json'
     },
@@ -98,7 +99,7 @@ rp(options).then(function(response) {
     // Store ApiToken, CompanyAPIURL
     ApiToken = response.ApiToken;
     CompanyAPIURL = response.CompanyAPIURL;
-    console.log(ApiToken, CompanyAPIURL);
+    // console.log(ApiToken, CompanyAPIURL);
 
     // Now we can make get some data!
     // url depends on which service you want to use
@@ -155,7 +156,7 @@ rp(options).then(function(response) {
                 console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err, null, 2));
+                // console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
         }
@@ -167,31 +168,33 @@ rp(options).then(function(response) {
                 console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err, null, 2));
+                // console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
         }
 
+        // wrInsertProducts returns an array of promises
         if (exportType === "products") {
             return promise.all(wrInsertProducts(results)).then(function(response) {
                 // all requests were successful
                 console.log(JSON.stringify(response, null, 2));
                 console.log("Success!");
             }).catch(function(err) {
-                console.log(JSON.stringify(err, null, 2));
+                // console.log(JSON.stringify(err, null, 2));
                 throw new Error(err);
             });
         } else if (exportType != "contacts" || exportType != "orders" || exportType != "products") {
-            console.log("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
+            // console.log("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
             throw new Error("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
         }
 
     }).catch(function(err) {
-        console.error(JSON.stringify(err, null, 2));
+        // console.error(JSON.stringify(err, null, 2));
         throw new Error(err);
     });
 }).catch(function(err) {
     // POST failed
+    console.error(JSON.stringify(err, null, 2));
     throw new Error(err);
 });
 
@@ -231,15 +234,18 @@ function wrInsertContacts(results) {
 
     var options = {
         method: 'POST',
-        url: "https://api.wickedreports.com/contacts",
+        url: 'https://api.wickedreports.com/contacts',
         headers: {
             'Content-Type': 'application/json',
-            'apikey': wrApikeyNew//,
-            //'test': testMode // set by NODE_ENV
+            'apikey': wrApikeyNew
         },
         body: '',
         json: true
     };
+
+    // determined by NODE_ENV
+    if (testMode)
+        options.headers.test = 1;
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
@@ -259,7 +265,7 @@ function wrInsertProducts(results) {
 
     var wrProducts = results.map(function(ct) {
         return {
-            "SourceSystem": "CircuiTree-Products", // CircuiTree-Products
+            "SourceSystem": "CircuiTree-Orders", // CircuiTree-Products
             "SourceID": ct.EventID, // varchar(500) REQUIRED// product id in the original system
             "ProductName": ct.LocationName, // varchar(500) REQUIRED//
             "ProductPrice": ct.EventDivisionPrice // decimal(18,2) REQUIRED//
@@ -278,15 +284,18 @@ function wrInsertProducts(results) {
 
     var options = {
         method: 'POST',
-        url: "https://api.wickedreports.com/products",
+        url: 'https://api.wickedreports.com/products',
         headers: {
             'Content-Type': 'application/json',
-            'apikey': '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9'//,
-            //'test': testMode // set by NODE_ENV
+            'apikey': wrApiKeyNew
         },
         body: '',
         json: true
     };
+
+    // determined by NODE_ENV
+    if (testMode)
+        options.headers.test = 1;
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
@@ -430,12 +439,16 @@ function wrInsertOrders(results) {
         url: "https://api.wickedreports.com/orders",
         headers: {
             'Content-Type': 'application/json',
-            'apikey': wrApiKeyNew//,
-            //'test': testMode // For testing, will appear in the API Verification tool
+            'apikey': wrApiKeyNew
         },
+        timeout: 5000000,
         body: '',
         json: true
     };
+
+    // determined by NODE_ENV
+    if (testMode)
+        options.headers.test = 1;
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
