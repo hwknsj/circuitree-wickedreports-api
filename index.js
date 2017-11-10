@@ -20,6 +20,7 @@ var APIKey,
     CompanyCode,
     circuiTree,
     options,
+    sourceSystem,
     ApiToken,
     CompanyAPIURL,
     testMode;
