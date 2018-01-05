@@ -37,7 +37,9 @@ e.g. in command line type:
 var args = process.argv.slice(2);
 var exportType = args[0],
     eventYear = args[1],
-    testMode = process.env.NODE_ENV === "test"
+    // testMode tells Wicked Reports to store data in the 'test'
+    // database which is accessible from the API testing menu
+    testMode = process.env.NODE_ENV === 'test'
         ? 1
         : false;
 
@@ -56,8 +58,11 @@ switch (exportType) {
         throw console.error("Incorrect syntax! Use 'npm start orders YYYY\n'");
 }
 
-/*          BRING YOUR OWN CONFIGURATION FILE         */
+/* -----------------------------------
+   BRING YOUR OWN CONFIGURATION FILE
+   ----------------------------------- */
 // Fetches credentials for Wicked Reports and CircuiTree
+// Run test environment by default
 var env = process.env.NODE_ENV || 'test';
 var config = require('./config')[env];
 
@@ -69,7 +74,7 @@ let circuiTree = config.circuiTree;
 let wrApiKey = config.wicketReports.ApiKey;
 
 
-/* ------------------------------------
+/* -----------------------------------
     CircuiTree Request
    ----------------------------------- */
 
@@ -95,19 +100,21 @@ circuiTreeQuery(options);
 function circuiTreeQuery (options) {
     rp(options).then(function(response) {
         // POST successful
-        // console.log(response);
         // Store ApiToken, CompanyAPIURL
         ApiToken = response.ApiToken;
         CompanyAPIURL = response.CompanyAPIURL;
-        // console.log(ApiToken, CompanyAPIURL);
 
-        // Now we can make get some data!
-        // url depends on which service you want to use
-        // (see https://api.mycircuitree.com/TBM/Services.aspx)
+        /* Now we can make get some data!
+           url depends on which service you want to use
+           (see https://api.mycircuitree.com/TBM/Services.aspx) */
 
-        // We need to run ExportQueries, build query below
-        // Run the custom query ID '124' (Registration List – Detailed Email)
-        // or Registration Accounting Summary '-195'
+        /* We need to run ExportQueries, build query below
+           Run the custom query ID '124' (Registration List – Detailed Email),
+           Registration Accounting Summary '-195', or Event Availability '-397' */
+
+        /* The setup below will be specific to the data you are attempting
+           to export. For this use case, we added some additional parameters
+           to capture only active registrations and active attendees        */
 
         var requestURL = CompanyAPIURL + "/Exports/ExecuteQuery.json",
             requestQuery = {
@@ -122,7 +129,7 @@ function circuiTreeQuery (options) {
                     'ParameterValue': 1 // "Yes"
                 }
             ];
-        } else { // Order or contacts
+        } else { // Order or contacts - both ExportQueryIDs use same ParameterIDs
             requestQuery.QueryParameters = [
                 {
                     'ParameterID': 7, // Event Year
@@ -137,21 +144,17 @@ function circuiTreeQuery (options) {
         options.url = requestURL;
         options.body = requestQuery;
 
-        // console.log(options.body);
         return rp(options).then(function(response) {
 
             var results = JSON.parse(response.Results);
-
-            // return console.log(results);
 
             // wrInsertContacts returns an array of promises
             if (exportType === "contacts") {
                 return promise.all(wrInsertContacts(results)).then(function(response) {
                     // all requests were successful
-                    console.log(JSON.stringify(response, null, 2));
+                    // console.log(JSON.stringify(response, null, 2));
                     console.log("Success!");
                 }).catch(function(err) {
-                    // console.log(JSON.stringify(err, null, 2));
                     throw new Error(err);
                 });
             }
@@ -160,10 +163,9 @@ function circuiTreeQuery (options) {
             if (exportType === "orders") {
                 return promise.all(wrInsertOrders(results)).then(function(response) {
                     // all requests were successful
-                    console.log(JSON.stringify(response, null, 2));
+                    // console.log(JSON.stringify(response, null, 2));
                     console.log("Success!");
                 }).catch(function(err) {
-                    // console.log(JSON.stringify(err, null, 2));
                     throw new Error(err);
                 });
             }
@@ -172,19 +174,16 @@ function circuiTreeQuery (options) {
             if (exportType === "products") {
                 return promise.all(wrInsertProducts(results)).then(function(response) {
                     // all requests were successful
-                    console.log(JSON.stringify(response, null, 2));
+                    // console.log(JSON.stringify(response, null, 2));
                     console.log("Success!");
                 }).catch(function(err) {
                     // console.log(JSON.stringify(err, null, 2));
                     throw new Error(err);
                 });
             } else /* if (exportType != "contacts" || exportType != "orders" || exportType != "products") */ {
-                // console.log("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
                 throw new Error("Please use the syntax: 'npm start orders 2016' or 'npm products' and try again.\n");
             }
-
         }).catch(function(err) {
-            // console.error(JSON.stringify(err, null, 2));
             throw new Error(err);
         });
     }).catch(function(err) {
@@ -236,13 +235,15 @@ function wrInsertContacts(results) {
             'Content-Type': 'application/json',
             'apikey': wrApiKey
         },
+        timeout: 5000000,
         body: '',
         json: true
     };
 
     // determined by NODE_ENV
-    if (testMode)
+    if (testMode) {
         options.headers.test = 1;
+    }
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
@@ -286,13 +287,15 @@ function wrInsertProducts(results) {
             'Content-Type': 'application/json',
             'apikey': wrApiKey
         },
+        timeout: 5000000,
         body: '',
         json: true
     };
 
     // determined by NODE_ENV
-    if (testMode)
+    if (testMode) {
         options.headers.test = 1;
+    }
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
@@ -305,7 +308,6 @@ function wrInsertProducts(results) {
 
 // XXX: Insert Orders
 // NEW 13 Sept. 2017 - by Joel Hawkins to get Orders
-// Need to do some math... we are going to
 // input is CircuiTree query -195 results: orders
 function wrInsertOrders(results) {
 
@@ -313,9 +315,9 @@ function wrInsertOrders(results) {
         // orderTotal should be the sum of all charges, discounts, and Scholarships
         // This may be different than Payments
 
-        // The total amount paid should be totalPayments = Payments + GiftCardPayments
-        // ignore the ( variable ? variable : 0 ) things. This just means "does variable exist" ? value_if_true : value_if_false
-        // this way we don't get errors for having blank, null, or NaN ("Not a Number"), not all contacts have these values.
+        /* The total amount paid should be totalPayments = Payments + GiftCardPayments
+           ignore the ( variable ? variable : 0 ) things. This just means "does variable exist" ? value_if_true : value_if_false
+           this way we don't get errors for having blank, null, or NaN ("Not a Number"), not all contacts have these values.  */
         var chargesTotal = (
             ct.Charges
             ? ct.Charges
@@ -340,7 +342,7 @@ function wrInsertOrders(results) {
             ? ct.Payments
             : chargesTotal;
         return {
-            "SourceSystem": sourceSystem, // TBMCircuiTree
+            "SourceSystem": sourceSystem, // Chosen SourceSystem set in config.js file
             "SourceID": ct.ItineraryID, // ItineraryID unique ID for the itinerary
             "CreateDate": moment(ct.EventBeginDate).format("YYYY-MM-DD HH:mm:ss"), // (format: "YYYY-MM-DD HH:MM:SS" UTC time)
             "ContactID": ct.entityid, // (unique number for that specific individual (camper)) or RegistrationID (unique for the specific individual (camper) registration to a specific event). Preference?
@@ -450,8 +452,9 @@ function wrInsertOrders(results) {
     };
 
     // determined by NODE_ENV
-    if (testMode)
+    if (testMode) {
         options.headers.test = 1;
+    }
 
     for (var i = 0; i < arrays.length; i++) {
         options.body = arrays[i];
