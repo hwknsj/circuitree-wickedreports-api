@@ -56,19 +56,17 @@ switch (exportType) {
         throw console.error("Incorrect syntax! Use 'npm start orders YYYY\n'");
 }
 
-var sourceSystem = "TBMCircuiTree";
+/*          BRING YOUR OWN CONFIGURATION FILE         */
+// Fetches credentials for Wicked Reports and CircuiTree
+var env = process.env.NODE_ENV || 'test';
+var config = require('./config')[env];
 
 // CircuiTree login info:
-circuiTree = {
-    'APIKey': 'ab0b374c-a2e0-4b5e-8d95-f3bc61aa37a7',
-    'Username': 'tbm.wreports',
-    'Password': 't26IWPcQQouN5q',
-    'CompanyCode': '15'
-};
+let sourceSystem = config.circuiTree.SourceSystem;
+let circuiTree = config.circuiTree;
 
 // Wicked Reports credentials:
-const testApikey = 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO',
-      wrApiKey = '8AhsXgT1QxwOyXqSzjcL8RVYTNF21Cx9';
+let wrApiKey = config.wicketReports.ApiKey;
 
 
 /* ------------------------------------
