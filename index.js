@@ -35,7 +35,7 @@ e.g. in command line type:
     npm test
  ----------------------------------------------------- */
 var args = process.argv.slice(2);
-var exportType = args[0],
+var exportType = args[0], // can be 'orders', 'contacts', or 'products'
     eventYear = args[1],
     // testMode tells Wicked Reports to store data in the 'test'
     // database which is accessible from the API testing menu

@@ -2,7 +2,7 @@
 
 echo "Hi, this script will let you automatically click to run the CircuiTree to Wicked Reports application!"
 echo "Set the range of year(s) for which the 'Detailed email' CircuiTree list will be imported into Wicked Reports"
-echo "You can entexsr '2017' or '2017|2018' form multiple years:"
+echo "You can enter '2017' or '2017|2018' for multiple years:"
 year=
 while [ -z $year ]
 do
