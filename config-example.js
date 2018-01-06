@@ -17,7 +17,7 @@ const config = {
             'Password': 'yourPassword',
             'CompanyCode': 'yourCompanyCode' // e.g. '12', a string int
         },
-        wicketReports: {
+        wickedReports: {
             /* Official Wicked Reports test ApiKey.
               *Note that this is different from using
                the NODE_ENV='test' which will import
@@ -35,7 +35,7 @@ const config = {
             'Password': 'yourPassword',
             'CompanyCode': 'yourCompanyCode' // e.g. '12', a string int
         },
-        wicketReports: {
+        wickedReports: {
             ApiKey: 'F76AahJFyq7NC25jSjQ4mO2twEXddmhO'
         }
     }
