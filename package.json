@@ -1,7 +1,7 @@
 {
-    "name": "prepared-marketing",
-    "version": "1.0.0",
-    "description": "Node.js application to connect CircuiTree API to Wicked Reports API for Prepared Marketing.",
+    "name": "circuiTree-wickedReports-export",
+    "version": "1.1.0",
+    "description": "Node.js application to connect CircuiTree API to Wicked Reports API.",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
@@ -16,15 +16,14 @@
     "keywords": [
         "CircuiTree",
         "API",
-        "Wicked",
-        "Reports"
+        "Wicked Reports"
     ],
     "author": "Joel Hawkins <hwknsj@gmail.com>",
     "license": "ISC",
     "dependencies": {
         "bcrypt-nodejs": "0.0.3",
         "bluebird": "^3.5.1",
-        "moment": "^2.19.1",
+        "moment": "^2.20.1",
         "request": "^2.83.0",
         "request-promise": "^4.2.2"
     }

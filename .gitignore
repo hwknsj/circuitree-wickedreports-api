@@ -3,3 +3,4 @@ node_modules/*
 /pm-circuitree-wreports-master.zip
 /package-lock.json
 config.js
+formatting.js
