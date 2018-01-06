@@ -11,14 +11,18 @@
     },
     "repository": {
         "type": "git",
-        "url": "prepared-marketing"
+        "url": "https://github.com/hwknsj/circuitree-wickedreports-api.git"
     },
     "keywords": [
         "CircuiTree",
         "API",
         "Wicked Reports"
     ],
-    "author": "Joel Hawkins <hwknsj@gmail.com>",
+    "author": {
+        "name": "Joel Hawkins",
+        "email": "hwknsj@gmail.com",
+        "url": "https://joel.fm"
+    },
     "license": "ISC",
     "dependencies": {
         "bcrypt-nodejs": "0.0.3",
